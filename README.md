@@ -157,3 +157,4 @@ sqlite3 hughes_lawn_ai.db "PRAGMA integrity_check;"
 ---
 
 🌱 **Hughes Lawn AI** - Intelligent lawn care for the modern home
+# Force deployment refresh
