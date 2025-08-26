@@ -1,0 +1,27 @@
+# Azure App Service Configuration
+runtime: python39
+service: hughes-lawn-ai
+
+env_variables:
+  ECOWITT_APP_KEY: "14CF42F092D6CC8C5421160A37A0417A"
+  ECOWITT_API_KEY: "e5f2d6ff-2323-477e-8041-6e284b401b83"
+  ECOWITT_MAC: "34:94:54:96:22:F5"
+  RAINBIRD_IP: "q0852082.eero.online"
+  RAINBIRD_PIN: "886004"
+  N8N_WEBHOOK_URL: "https://workflows.saxtechnology.com/webhook/hughes-lawn-ai"
+
+handlers:
+- url: /static
+  static_dir: static
+  
+- url: /grass-background
+  static_files: grass.jpeg
+  upload: grass.jpeg
+  
+- url: /.*
+  script: auto
+
+automatic_scaling:
+  min_instances: 1
+  max_instances: 2
+  target_cpu_utilization: 0.75

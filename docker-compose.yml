@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  hughes-lawn-ai:
+    build: .
+    container_name: hughes-lawn-ai
+    ports:
+      - "8000:8000"
+    environment:
+      - ECOWITT_APP_KEY=14CF42F092D6CC8C5421160A37A0417A
+      - ECOWITT_API_KEY=e5f2d6ff-2323-477e-8041-6e284b401b83
+      - ECOWITT_MAC=34:94:54:96:22:F5
+      - RAINBIRD_IP=q0852082.eero.online
+      - RAINBIRD_PIN=886004
+      - N8N_WEBHOOK_URL=https://workflows.saxtechnology.com/webhook/hughes-lawn-ai
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - hughes-network
+
+networks:
+  hughes-network:
+    driver: bridge

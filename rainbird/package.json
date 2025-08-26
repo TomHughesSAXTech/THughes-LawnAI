@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "aes-js": "^3.1.2",
+    "express": "^5.1.0",
+    "node-rainbird": "^2.0.1",
+    "text-encoder": "^0.0.4"
+  }
+}

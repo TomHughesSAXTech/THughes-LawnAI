@@ -1,0 +1,381 @@
+{
+  "name": "Hughes Lawn AI Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "hughes-lawn-ai",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook_trigger",
+      "name": "Hughes Lawn AI Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "hughes-lawn-ai"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json[\"action\"]}}",
+              "operation": "equals",
+              "value2": "analyze_moisture"
+            }
+          ]
+        }
+      },
+      "id": "moisture_check",
+      "name": "Check Moisture Action",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Analyze soil moisture levels and determine irrigation needs\nconst zones = items[0].json.zones;\nconst weather = items[0].json.weather;\nconst irrigationNeeds = [];\n\n// Define optimal moisture ranges\nconst optimalRange = { min: 30, max: 40 };\n\nfor (const [zoneName, zoneData] of Object.entries(zones)) {\n  const moisture = zoneData.moisture;\n  const needsWater = moisture < optimalRange.min;\n  const overWatered = moisture > optimalRange.max;\n  \n  irrigationNeeds.push({\n    zone: zoneName,\n    currentMoisture: moisture,\n    needsWater: needsWater,\n    overWatered: overWatered,\n    targetDuration: needsWater ? Math.round((optimalRange.min - moisture) * 2) : 0,\n    status: overWatered ? 'OVER_WATERED' : needsWater ? 'NEEDS_WATER' : 'OPTIMAL'\n  });\n}\n\n// Check weather conditions\nconst recentRain = weather.rainfall_24h > 0.1;\nconst upcomingRain = weather.forecast && weather.forecast.rain_probability > 60;\n\n// Generate irrigation decision\nconst shouldIrrigate = irrigationNeeds.some(z => z.needsWater) && !recentRain && !upcomingRain;\n\nreturn [{\n  json: {\n    timestamp: new Date().toISOString(),\n    irrigationNeeds: irrigationNeeds,\n    weatherFactors: {\n      recentRain: recentRain,\n      upcomingRain: upcomingRain,\n      temperature: weather.temperature,\n      humidity: weather.humidity\n    },\n    decision: {\n      shouldIrrigate: shouldIrrigate,\n      reason: shouldIrrigate ? 'Low moisture detected' : recentRain ? 'Recent rainfall' : 'Optimal conditions'\n    }\n  }\n}];"
+      },
+      "id": "analyze_moisture",
+      "name": "Analyze Moisture Levels",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [650, 250]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json[\"decision\"][\"shouldIrrigate\"]}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "irrigation_decision",
+      "name": "Should Irrigate?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [850, 250]
+    },
+    {
+      "parameters": {
+        "url": "={{$node[\"webhook_trigger\"].json[\"callback_url\"]}}/api/irrigate",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "zones",
+              "value": "={{$json[\"irrigationNeeds\"]}}"
+            },
+            {
+              "name": "duration",
+              "value": "={{$json[\"irrigationNeeds\"].map(z => z.targetDuration)}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "trigger_irrigation",
+      "name": "Trigger RainBird Irrigation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$node[\"webhook_trigger\"].json[\"action\"]}}",
+              "operation": "equals",
+              "value2": "mowing_check"
+            }
+          ]
+        }
+      },
+      "id": "mowing_check",
+      "name": "Check Mowing Action",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [450, 450]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Analyze conditions for mowing recommendation\nconst data = items[0].json;\nconst weather = data.weather;\nconst moisture = data.average_moisture || 35;\nconst daysSinceMow = data.days_since_mow || 0;\n\n// Mowing conditions check\nconst conditions = {\n  moistureOk: moisture >= 20 && moisture <= 50,\n  weatherOk: weather.temperature > 50 && weather.temperature < 95,\n  noRain: weather.rainfall_24h < 0.1,\n  windOk: weather.wind_speed < 15,\n  needsMowing: daysSinceMow >= 5\n};\n\n// Calculate confidence score\nlet confidence = 0;\nif (conditions.moistureOk) confidence += 25;\nif (conditions.weatherOk) confidence += 25;\nif (conditions.noRain) confidence += 25;\nif (conditions.windOk) confidence += 15;\nif (conditions.needsMowing) confidence += 10;\n\n// Generate recommendation\nconst canMow = confidence >= 70;\nconst idealTime = weather.temperature < 75 ? 'Morning (8-10 AM)' : 'Evening (5-7 PM)';\n\nreturn [{\n  json: {\n    timestamp: new Date().toISOString(),\n    conditions: conditions,\n    confidence: confidence,\n    recommendation: {\n      canMow: canMow,\n      idealTime: idealTime,\n      reason: canMow ? 'Conditions are favorable' : 'Wait for better conditions',\n      nextCheck: '24 hours'\n    },\n    grassHealth: {\n      height: '1.5-2 inches optimal',\n      season: data.season || 'Summer',\n      growthRate: 'Normal'\n    }\n  }\n}];"
+      },
+      "id": "analyze_mowing",
+      "name": "Analyze Mowing Conditions",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [650, 450]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$node[\"webhook_trigger\"].json[\"action\"]}}",
+              "operation": "equals",
+              "value2": "fertilizer_check"
+            }
+          ]
+        }
+      },
+      "id": "fertilizer_check",
+      "name": "Check Fertilizer Action",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [450, 600]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Fertilizer recommendation based on season and grass type\nconst month = new Date().getMonth() + 1;\nconst season = items[0].json.season || 'Summer';\n\nconst fertilizerSchedule = {\n  1: { product: 'None', reason: 'Bermuda grass is dormant' },\n  2: { product: 'Pre-emergent', reason: 'Prevent crabgrass' },\n  3: { product: '8-8-8 Starter', reason: 'Green-up phase' },\n  4: { product: '16-4-8 Bermuda Blend', reason: 'First major feeding' },\n  5: { product: '32-0-10 High Nitrogen', reason: 'Growth phase' },\n  6: { product: '15-0-15 Summer Blend', reason: 'Summer feeding' },\n  7: { product: 'Light 15-0-15', reason: 'Heat stress protection' },\n  8: { product: '16-4-8 Bermuda Blend', reason: 'Resume feeding' },\n  9: { product: '5-10-30 Fall Prep', reason: 'Root development' },\n  10: { product: 'Winterizer', reason: 'Final feeding' },\n  11: { product: 'None', reason: 'Prepare for dormancy' },\n  12: { product: 'None', reason: 'Dormant season' }\n};\n\nconst recommendation = fertilizerSchedule[month];\nconst nextApplication = month < 10 ? 'In 4 weeks' : 'Next Spring';\n\nreturn [{\n  json: {\n    timestamp: new Date().toISOString(),\n    month: month,\n    season: season,\n    grassType: 'TifTuf Bermuda',\n    recommendation: {\n      product: recommendation.product,\n      reason: recommendation.reason,\n      applicationRate: '1 lb N per 1000 sq ft',\n      nextApplication: nextApplication,\n      wateringAfter: 'Water immediately after application'\n    },\n    tips: [\n      'Apply in early morning or evening',\n      'Ensure grass is dry before application',\n      'Water thoroughly after application'\n    ]\n  }\n}];"
+      },
+      "id": "analyze_fertilizer",
+      "name": "Fertilizer Recommendation",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [650, 600]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendText",
+        "chatId": "={{$node[\"webhook_trigger\"].json[\"notification_chat_id\"]}}",
+        "text": "🌱 Hughes Lawn AI Alert\\n\\n{{$json[\"message\"]}}",
+        "options": {}
+      },
+      "id": "send_notification",
+      "name": "Send Notification (Optional)",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [1050, 450],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "functionCode": "// Compile all analyses into a comprehensive response\nconst responses = [];\n\n// Add relevant analysis results\nif (items[0].json.irrigationNeeds) {\n  responses.push({\n    type: 'irrigation',\n    data: items[0].json\n  });\n}\n\nif (items[0].json.recommendation && items[0].json.confidence !== undefined) {\n  responses.push({\n    type: 'mowing',\n    data: items[0].json\n  });\n}\n\nif (items[0].json.grassType) {\n  responses.push({\n    type: 'fertilizer',\n    data: items[0].json\n  });\n}\n\n// Generate summary message\nconst summary = {\n  timestamp: new Date().toISOString(),\n  analyses: responses,\n  status: 'success',\n  message: `Completed ${responses.length} analysis tasks`,\n  nextScheduledCheck: new Date(Date.now() + 6*60*60*1000).toISOString() // 6 hours\n};\n\nreturn [{json: summary}];"
+      },
+      "id": "compile_response",
+      "name": "Compile Response",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "status",
+              "value": "success"
+            },
+            {
+              "name": "message",
+              "value": "Analysis complete"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "webhook_response",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyDay",
+              "hour": 6,
+              "minute": 0
+            },
+            {
+              "mode": "everyDay",
+              "hour": 12,
+              "minute": 0
+            },
+            {
+              "mode": "everyDay",
+              "hour": 18,
+              "minute": 0
+            }
+          ]
+        }
+      },
+      "id": "schedule_trigger",
+      "name": "Daily Schedule (6am, 12pm, 6pm)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 550]
+    },
+    {
+      "parameters": {
+        "url": "https://red-moss-09693000f.1.azurestaticapps.net/api/status",
+        "method": "GET",
+        "options": {}
+      },
+      "id": "fetch_system_status",
+      "name": "Fetch System Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [450, 750]
+    }
+  ],
+  "connections": {
+    "webhook_trigger": {
+      "main": [
+        [
+          {
+            "node": "moisture_check",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "mowing_check",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "fertilizer_check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "moisture_check": {
+      "main": [
+        [
+          {
+            "node": "analyze_moisture",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "analyze_moisture": {
+      "main": [
+        [
+          {
+            "node": "irrigation_decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "irrigation_decision": {
+      "main": [
+        [
+          {
+            "node": "trigger_irrigation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "compile_response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "trigger_irrigation": {
+      "main": [
+        [
+          {
+            "node": "compile_response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "mowing_check": {
+      "main": [
+        [
+          {
+            "node": "analyze_mowing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "analyze_mowing": {
+      "main": [
+        [
+          {
+            "node": "send_notification",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "compile_response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fertilizer_check": {
+      "main": [
+        [
+          {
+            "node": "analyze_fertilizer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "analyze_fertilizer": {
+      "main": [
+        [
+          {
+            "node": "compile_response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "compile_response": {
+      "main": [
+        [
+          {
+            "node": "webhook_response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "schedule_trigger": {
+      "main": [
+        [
+          {
+            "node": "fetch_system_status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "id": "hughes-lawn-ai-automation",
+  "tags": []
+}
