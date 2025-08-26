@@ -1,0 +1,105 @@
+{
+  "name": "Hughes Lawn AI - Enhanced Autonomous System",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6,12,18 * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Trigger (6am, 12pm, 6pm)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "hughes-lawn-ai-webhook",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Manual Trigger Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [200, 500],
+      "webhookId": "hughes-lawn-ai-webhook"
+    },
+    {
+      "parameters": {
+        "url": "https://proud-grass-04d18890f.1.azurestaticapps.net/api/status",
+        "method": "GET",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 10000
+        }
+      },
+      "id": "fetch-system-data",
+      "name": "Fetch Hughes Lawn AI Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [450, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Enhanced AI Analysis with comprehensive lawn care intelligence\nconst data = $input.first().json;\n\n// Current environmental data\nconst weather = data.weather || {};\nconst soilMoisture = data.soil_moisture || {};\nconst mowing = data.mowing || {};\nconst location = data.location || {};\n\n// Current time and season analysis\nconst now = new Date();\nconst currentHour = now.getHours();\nconst currentMonth = now.getMonth() + 1;\nconst season = getSeason(currentMonth);\n\n// Irrigation Analysis with AI Logic\nconst irrigationAnalysis = {\n  recommendation: 'wait',\n  confidence: 0,\n  zones_to_water: [],\n  reasoning: '',\n  weather_factors: {\n    recent_rain: weather.rainfall_24h || 0,\n    temperature: weather.temperature || 75,\n    humidity: weather.humidity || 50,\n    wind_speed: weather.wind_speed || 0\n  }\n};\n\n// Zone analysis with Bermuda grass specific needs\nconst zoneAnalysis = {\n  'front_yard': { zones: [1, 2, 3, 7], optimal_min: 30, optimal_max: 40 },\n  'swing_set': { zones: [4, 5], optimal_min: 30, optimal_max: 40 },\n  'crepe_myrtle': { zones: [6], optimal_min: 30, optimal_max: 40 }\n};\n\nlet totalConfidence = 0;\nlet factorsConsidered = 0;\n\n// Weather factor analysis\nconst recentRain = weather.rainfall_24h || 0;\nif (recentRain < 0.1) {\n  totalConfidence += 25;\n  irrigationAnalysis.reasoning += 'No recent rainfall. ';\n} else {\n  irrigationAnalysis.reasoning += `Recent rainfall: ${recentRain}\\\" - reducing need. `;\n}\nfactorsConsidered++;\n\n// Temperature analysis for Bermuda grass\nconst temp = weather.temperature || 75;\nif (temp >= 70 && temp <= 90) {\n  totalConfidence += 20;\n  irrigationAnalysis.reasoning += 'Temperature optimal for Bermuda grass. ';\n} else if (temp > 90) {\n  totalConfidence += 30; // Higher need in extreme heat\n  irrigationAnalysis.reasoning += 'High temperature increases water need. ';\n}\nfactorsConsidered++;\n\n// Humidity analysis\nconst humidity = weather.humidity || 50;\nif (humidity < 60) {\n  totalConfidence += 15;\n  irrigationAnalysis.reasoning += 'Low humidity increases watering need. ';\n}\nfactorsConsidered++;\n\n// Soil moisture analysis\nfor (const [zoneName, zoneInfo] of Object.entries(zoneAnalysis)) {\n  const moistureLevel = soilMoisture[zoneName] || 35;\n  \n  if (moistureLevel < zoneInfo.optimal_min) {\n    irrigationAnalysis.zones_to_water.push({\n      zone: zoneName,\n      rainbird_zones: zoneInfo.zones,\n      duration: calculateDuration(moistureLevel, zoneInfo.optimal_min, season),\n      reason: `Soil moisture ${moistureLevel}% below optimal ${zoneInfo.optimal_min}%`,\n      priority: moistureLevel < 20 ? 'high' : 'medium'\n    });\n  }\n}\n\n// Seasonal adjustments\nif (season === 'growing') {\n  totalConfidence += 10;\n  irrigationAnalysis.reasoning += 'Growing season increases water needs. ';\n} else if (season === 'dormant') {\n  totalConfidence -= 15;\n  irrigationAnalysis.reasoning += 'Dormant season reduces water needs. ';\n}\n\n// Time-based analysis (prefer early morning)\nif (currentHour >= 6 && currentHour <= 8) {\n  totalConfidence += 15;\n  irrigationAnalysis.reasoning += 'Optimal watering time (early morning). ';\n} else if (currentHour >= 18 && currentHour <= 20) {\n  totalConfidence += 10;\n  irrigationAnalysis.reasoning += 'Acceptable evening watering time. ';\n} else {\n  totalConfidence -= 10;\n  irrigationAnalysis.reasoning += 'Not optimal watering time. ';\n}\n\n// Final calculations\nirrigation"
+        
+      },
+      "id": "enhanced-ai-analysis",
+      "name": "Enhanced AI Analysis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 400]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger (6am, 12pm, 6pm)": {
+      "main": [
+        [
+          {
+            "node": "Fetch Hughes Lawn AI Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger Webhook": {
+      "main": [
+        [
+          {
+            "node": "Fetch Hughes Lawn AI Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Hughes Lawn AI Data": {
+      "main": [
+        [
+          {
+            "node": "Enhanced AI Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

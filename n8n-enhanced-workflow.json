@@ -1,0 +1,166 @@
+{
+  "name": "Hughes Lawn AI - Enhanced Autonomous System",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6,12,18 * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Trigger (6am, 12pm, 6pm)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "hughes-lawn-ai-webhook",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Manual Trigger Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [200, 500],
+      "webhookId": "hughes-lawn-ai-webhook"
+    },
+    {
+      "parameters": {
+        "url": "https://proud-grass-04d18890f.1.azurestaticapps.net/api/status",
+        "method": "GET",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 10000
+        }
+      },
+      "id": "fetch-system-data",
+      "name": "Fetch Hughes Lawn AI Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [450, 400]
+    },
+    {
+      "parameters": {
+        "text": "=You are an autonomous lawn AI specialist analyzing real-time data for the Hughes family lawn in Fuquay Varina, NC (Zone 7b/8a). Your job is to make intelligent decisions about irrigation and mowing based on comprehensive data analysis.\n\nCurrent Data Analysis:\n{{ JSON.stringify($json, null, 2) }}\n\nLocation Context:\n- Location: Fuquay Varina, NC 27526\n- USDA Zone: 7b/8a\n- Grass Type: TifTuf Bermuda\n- Season: {{ new Date().toLocaleDateString('en-US', {month: 'long'}) }}\n- Current Month: {{ new Date().getMonth() + 1 }}/12\n\nYour tasks:\n1. IRRIGATION ANALYSIS:\n   - Analyze soil moisture levels for 3 zones (front_yard, swing_set, crepe_myrtle)\n   - Consider weather data (temperature, humidity, recent rainfall, forecast)\n   - Account for seasonal water needs and Bermuda grass requirements\n   - Factor in time of day for optimal watering (early morning preferred)\n   - Consider RainBird controller availability via Dynamic DNS\n\n2. MOWING RECOMMENDATION:\n   - Evaluate current mowing confidence score\n   - Analyze weather conditions for safety and grass health\n   - Consider seasonal growth patterns\n   - Factor in recent rainfall and soil conditions\n   - Provide confidence percentage (0-100%)\n\n3. SEASONAL ADJUSTMENTS:\n   - Adjust recommendations based on current month\n   - Account for dormant season (Nov-Feb), green-up (Mar-Apr), growing season (May-Sep), transition (Oct)\n   - Provide fertilizer recommendations if relevant\n\nReturn a comprehensive JSON response with:\n{\n  \"timestamp\": \"ISO timestamp\",\n  \"location\": {\n    \"city\": \"Fuquay Varina\",\n    \"state\": \"NC\",\n    \"zone\": \"7b/8a\",\n    \"season\": \"current season name\"\n  },\n  \"irrigation\": {\n    \"recommendation\": \"irrigate|wait|skip\",\n    \"confidence\": 0-100,\n    \"zones_to_water\": [\n      {\n        \"zone\": \"zone_name\",\n        \"rainbird_zones\": [zone_numbers],\n        \"duration\": minutes,\n        \"reason\": \"explanation\",\n        \"priority\": \"high|medium|low\"\n      }\n    ],\n    \"optimal_time\": \"time recommendation\",\n    \"reasoning\": \"detailed analysis\",\n    \"weather_factors\": {\n      \"recent_rain\": \"amount and impact\",\n      \"forecast\": \"upcoming weather consideration\",\n      \"temperature\": \"temperature impact\",\n      \"humidity\": \"humidity impact\"\n    }\n  },\n  \"mowing\": {\n    \"recommendation\": \"mow_now|wait|skip\",\n    \"confidence\": 0-100,\n    \"optimal_time\": \"time recommendation\",\n    \"reasoning\": \"detailed analysis\",\n    \"factors\": [\n      \"list of factors considered\"\n    ]\n  },\n  \"seasonal_advice\": {\n    \"current_focus\": \"what to focus on this month\",\n    \"fertilizer_recommendation\": \"if applicable\",\n    \"maintenance_suggestions\": [\"list of suggestions\"]\n  },\n  \"autonomous_actions\": [\n    {\n      \"action\": \"action_type\",\n      \"execute_immediately\": true/false,\n      \"delay_minutes\": number,\n      \"parameters\": {}\n    }\n  ]\n}\n\nBe thorough, practical, and conservative. Prioritize grass health and water conservation.",
+        "options": {
+          "systemMessage": "You are an expert autonomous lawn care AI with deep knowledge of Bermuda grass, North Carolina climate, and optimal irrigation practices. Always provide actionable, data-driven recommendations.",
+          "maxIterations": 3
+        }
+      },
+      "id": "ai-analysis-agent",
+      "name": "AI Lawn Analysis Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [700, 400]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4",
+        "options": {
+          "temperature": 0.3,
+          "maxTokens": 2000
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAzureOpenAi",
+      "typeVersion": 1,
+      "position": [600, 600],
+      "id": "azure-openai-model",
+      "name": "Azure OpenAI GPT-4",
+      "credentials": {
+        "azureOpenAiApi": {
+          "id": "SCpzWDlrEXtAksoO",
+          "name": "Azure Open AI account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [800, 600],
+      "id": "memory-buffer",
+      "name": "Conversation Memory"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse AI Response and Prepare Actions\nconst aiResponse = JSON.parse($input.first().json.output);\n\n// Validate the response structure\nif (!aiResponse || !aiResponse.irrigation || !aiResponse.mowing) {\n  throw new Error('Invalid AI response structure');\n}\n\n// Prepare autonomous actions\nconst actions = [];\nconst currentHour = new Date().getHours();\n\n// Process irrigation recommendations\nif (aiResponse.irrigation.recommendation === 'irrigate' && aiResponse.irrigation.confidence >= 70) {\n  for (const zone of aiResponse.irrigation.zones_to_water) {\n    // Only irrigate during optimal hours (6-8 AM or 6-8 PM)\n    if ((currentHour >= 6 && currentHour <= 8) || (currentHour >= 18 && currentHour <= 20)) {\n      for (const rainbirdZone of zone.rainbird_zones) {\n        actions.push({\n          type: 'irrigate',\n          zone: rainbirdZone,\n          duration: zone.duration,\n          priority: zone.priority,\n          reason: zone.reason,\n          execute_immediately: true,\n          delay_minutes: 0\n        });\n      }\n    } else {\n      // Schedule for next optimal time\n      let nextOptimalTime = 6; // Default to 6 AM next day\n      if (currentHour < 18) {\n        nextOptimalTime = 18; // 6 PM today if before 6 PM\n      }\n      \n      const delayMinutes = (nextOptimalTime - currentHour) * 60;\n      \n      for (const rainbirdZone of zone.rainbird_zones) {\n        actions.push({\n          type: 'irrigate',\n          zone: rainbirdZone,\n          duration: zone.duration,\n          priority: zone.priority,\n          reason: zone.reason,\n          execute_immediately: false,\n          delay_minutes: delayMinutes > 0 ? delayMinutes : (24 + nextOptimalTime - currentHour) * 60\n        });\n      }\n    }\n  }\n}\n\n// Add logging action\nactions.push({\n  type: 'log_analysis',\n  data: aiResponse,\n  execute_immediately: true,\n  delay_minutes: 0\n});\n\nreturn {\n  ai_response: aiResponse,\n  autonomous_actions: actions,\n  should_execute_irrigation: actions.some(a => a.type === 'irrigate' && a.execute_immediately),\n  total_zones_to_water: actions.filter(a => a.type === 'irrigate').length,\n  timestamp: new Date().toISOString(),\n  analysis_summary: {\n    irrigation_confidence: aiResponse.irrigation.confidence,\n    mowing_confidence: aiResponse.mowing.confidence,\n    season: aiResponse.location.season,\n    recommended_actions: actions.length\n  }\n};"
+      },
+      "id": "process-ai-response",
+      "name": "Process AI Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [950, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "should-irrigate",
+              "leftValue": "={{ $json.should_execute_irrigation }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equal"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "should-execute-irrigation",
+      "name": "Should Execute Irrigation?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1200, 300]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "split-irrigation-actions",
+      "name": "Split Irrigation Actions",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1450, 200]
+    },
+    {
+      "parameters": {
+        "url": "http://q0852082.eero.online:3000/api/start-zone",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"zone\": {{ $json.zone }},\n  \"duration\": {{ $json.duration }}\n}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },\n          \"timeout\": 15000,\n          \"retry\": {\n            \"enabled\": true,\n            \"maxAttempts\": 3,\n            \"waitBetweenAttempts\": 2000\n          }\n        }\n      },\n      \"id\": \"execute-irrigation\",\n      \"name\": \"Execute RainBird Irrigation\",\n      \"type\": \"n8n-nodes-base.httpRequest\",\n      \"typeVersion\": 4.1,\n      \"position\": [1700, 200]\n    },\n    {\n      \"parameters\": {\n        \"url\": \"https://proud-grass-04d18890f.1.azurestaticapps.net/webhook\",\n        \"method\": \"POST\",\n        \"sendHeaders\": true,\n        \"headerParameters\": {\n          \"parameters\": [\n            {\n              \"name\": \"Content-Type\",\n              \"value\": \"application/json\"\n            }\n          ]\n        },\n        \"sendBody\": true,\n        \"specifyBody\": \"json\",\n        \"jsonBody\": \"={\n  \\\"action\\\": \\\"autonomous_log\\\",\n  \\\"timestamp\\\": \\\"{{ $now.toISO() }}\\\",\n  \\\"source\\\": \\\"n8n_autonomous_system\\\",\n  \\\"data\\\": {{ JSON.stringify($('Process AI Response').item.json) }}\n}\",\n        \"options\": {\n          \"response\": {\n            \"response\": {\n              \"responseFormat\": \"json\"\n            }\n          },\n          \"timeout\": 10000\n        }\n      },\n      \"id\": \"log-to-azure\",\n      \"name\": \"Log Analysis to Azure\",\n      \"type\": \"n8n-nodes-base.httpRequest\",\n      \"typeVersion\": 4.1,\n      \"position\": [1200, 500]\n    },\n    {\n      \"parameters\": {\n        \"conditions\": {\n          \"options\": {\n            \"caseSensitive\": true,\n            \"leftValue\": \"\",\n            \"typeValidation\": \"strict\"\n          },\n          \"conditions\": [\n            {\n              \"id\": \"high-priority\",\n              \"leftValue\": \"={{ $('Process AI Response').item.json.ai_response.irrigation.confidence }}\",\n              \"rightValue\": 85,\n              \"operator\": {\n                \"type\": \"number\",\n                \"operation\": \"gte\"\n              }\n            }\n          ],\n          \"combinator\": \"and\"\n        },\n        \"options\": {}\n      },\n      \"id\": \"high-confidence-alert\",\n      \"name\": \"High Confidence Alert?\",\n      \"type\": \"n8n-nodes-base.if\",\n      \"typeVersion\": 2,\n      \"position\": [1450, 500]\n    },\n    {\n      \"parameters\": {\n        \"resource\": \"message\",\n        \"operation\": \"sendText\",\n        \"chatId\": \"YOUR_TELEGRAM_CHAT_ID\",\n        \"text\": \"🌱 Hughes Lawn AI Alert\\n\\n{{ $('Process AI Response').item.json.ai_response.irrigation.reasoning }}\\n\\nIrrigation Confidence: {{ $('Process AI Response').item.json.ai_response.irrigation.confidence }}%\\nMowing Confidence: {{ $('Process AI Response').item.json.ai_response.mowing.confidence }}%\\n\\nActions Taken: {{ $('Process AI Response').item.json.total_zones_to_water }} zones scheduled for watering\\n\\nTime: {{ $now.format('yyyy-MM-dd HH:mm:ss') }}\",\n        \"options\": {}\n      },\n      \"id\": \"send-notification\",\n      \"name\": \"Send Notification (Optional)\",\n      \"type\": \"n8n-nodes-base.telegram\",\n      \"typeVersion\": 1,\n      \"position\": [1700, 500],\n      \"continueOnFail\": true\n    },\n    {\n      \"parameters\": {\n        \"amount\": \"={{ $json.delay_minutes }}\",\n        \"unit\": \"minutes\"\n      },\n      \"id\": \"wait-for-optimal-time\",\n      \"name\": \"Wait for Optimal Time\",\n      \"type\": \"n8n-nodes-base.wait\",\n      \"typeVersion\": 1.1,\n      \"position\": [1450, 350],\n      \"webhookId\": \"hughes-lawn-ai-delayed\"\n    },\n    {\n      \"parameters\": {\n        \"jsCode\": \"// Weather Alert System\\nconst aiResponse = $('Process AI Response').item.json.ai_response;\\nconst weather = aiResponse.irrigation.weather_factors;\\n\\n// Check for severe weather conditions\\nconst alerts = [];\\n\n// High wind alert\\nif (weather.wind_speed && weather.wind_speed > 20) {\n  alerts.push({\\n    type: 'wind',\\n    severity: 'high',\\n    message: `High wind speeds (${weather.wind_speed} mph) - Irrigation and mowing not recommended`\\n  });\\n}\\n\\n// Extreme temperature alert\\nif (weather.temperature && (weather.temperature > 95 || weather.temperature < 32)) \\n  alerts.push({\\n    type: 'temperature',\\n    severity: weather.temperature > 95 ? 'high' : 'freeze',\\n    message: `Extreme temperature (${weather.temperature}°F) - Adjust care routine`\\n  });\\n}\\n\\n// Heavy rain alert\\nif (weather.recent_rain && parseFloat(weather.recent_rain) > 1.0) {\\n  alerts.push({\\n    type: 'rain',\\n    severity: 'medium',\\n    message: `Heavy recent rainfall (${weather.recent_rain}\\\") - Skip irrigation`\\n  });\\n}\\n\\nreturn {\\n  alerts: alerts,\\n  has_severe_alerts: alerts.some(a => a.severity === 'high'),\\n  alert_count: alerts.length,\\n  weather_data: weather\\n};\"},\n      \"id\": \"weather-alert-check\",\n      \"name\": \"Weather Alert Check\",\n      \"type\": \"n8n-nodes-base.code\",\n      \"typeVersion\": 2,\n      \"position\": [950, 600]\n    },\n    {\n      \"parameters\": {\n        \"values\": {\n          \"string\": [\n            {\n              \"name\": \"status\",\n              \"value\": \"success\"\n            },\n            {\n              \"name\": \"message\",\n              \"value\": \"Autonomous lawn analysis completed\"\n            },\n            {\n              \"name\": \"timestamp\",\n              \"value\": \"={{ $now.toISO() }}\"\n            }\n          ]\n        },\n        \"options\": {}\n      },\n      \"id\": \"final-response\",\n      \"name\": \"Final Response\",\n      \"type\": \"n8n-nodes-base.set\",\n      \"typeVersion\": 1,\n      \"position\": [1950, 400]\n    },\n    {\n      \"parameters\": {\n        \"respondWith\": \"json\",\n        \"responseBody\": \"={{ $json }}\",\n        \"options\": {\n          \"responseHeaders\": {\n            \"entries\": [\n              {\n                \"name\": \"Content-Type\",\n                \"value\": \"application/json\"\n              }\n            ]\n          }\n        }\n      },\n      \"id\": \"webhook-response\",\n      \"name\": \"Webhook Response\",\n      \"type\": \"n8n-nodes-base.respondToWebhook\",\n      \"typeVersion\": 1.1,\n      \"position\": [2200, 400]\n    }\n  ],\n  \"connections\": {\n    \"Schedule Trigger (6am, 12pm, 6pm)\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Fetch Hughes Lawn AI Data\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Manual Trigger Webhook\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Fetch Hughes Lawn AI Data\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Fetch Hughes Lawn AI Data\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"AI Lawn Analysis Agent\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"AI Lawn Analysis Agent\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Process AI Response\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Azure OpenAI GPT-4\": {\n      \"ai_languageModel\": [\n        [\n          {\n            \"node\": \"AI Lawn Analysis Agent\",\n            \"type\": \"ai_languageModel\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Conversation Memory\": {\n      \"ai_memory\": [\n        [\n          {\n            \"node\": \"AI Lawn Analysis Agent\",\n            \"type\": \"ai_memory\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Process AI Response\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Should Execute Irrigation?\",\n            \"type\": \"main\",\n            \"index\": 0\n          },\n          {\n            \"node\": \"Log Analysis to Azure\",\n            \"type\": \"main\",\n            \"index\": 0\n          },\n          {\n            \"node\": \"Weather Alert Check\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Should Execute Irrigation?\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Split Irrigation Actions\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ],\n        [\n          {\n            \"node\": \"Wait for Optimal Time\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Split Irrigation Actions\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Execute RainBird Irrigation\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Execute RainBird Irrigation\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Final Response\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Log Analysis to Azure\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"High Confidence Alert?\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"High Confidence Alert?\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Send Notification (Optional)\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ],\n        [\n          {\n            \"node\": \"Final Response\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Send Notification (Optional)\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Final Response\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Wait for Optimal Time\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Execute RainBird Irrigation\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Weather Alert Check\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Final Response\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Final Response\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Webhook Response\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    }\n  },\n  \"active\": true,\n  \"settings\": {\n    \"executionOrder\": \"v1\"\n  },\n  \"id\": \"hughes-lawn-ai-enhanced\",\n  \"tags\": [\n    {\n      \"name\": \"Lawn AI\",\n      \"id\": \"lawn-ai-tag\"\n    },\n    {\n      \"name\": \"Autonomous\",\n      \"id\": \"autonomous-tag\"\n    }\n  ]\n}
